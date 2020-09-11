@@ -83,18 +83,14 @@ for dataset_idx, file in enumerate(files):
                 # fit model
                 best_model = RandomizedSearchCV(model['model'], model['rs_params'], random_state=1,
                                                 n_iter=random_search_iters, cv=random_search_cv)
-                # start_time_train = int(round(time() * 1000))
                 start_time_train = time()
                 best_model.fit(X_train, y_train)
-                # runtime_train = (round(time() * 1000) - start_time_train) / 1000
                 runtime_train = time() - start_time_train
                 best_parameters = best_model.best_params_
 
                 # test model
-                # start_time_test = int(round(time() * 1000))
                 start_time_test = time()
                 y_pred = best_model.predict(X_test)
-                # runtime_test = (round(time() * 1000) - start_time_test) / 1000
                 runtime_test = time() - start_time_test
 
                 # compute metrics and prepare log entry
