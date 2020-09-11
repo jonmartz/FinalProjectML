@@ -37,15 +37,15 @@ models = [
 ]
 
 datasets_in_log = {}
-if not os.path.exists('results.csv'):
-    with open('results.csv', 'w', newline='') as log_file:
+if not os.path.exists('results/results.csv'):
+    with open('results/results.csv', 'w', newline='') as log_file:
         writer = csv.writer(log_file)
         header = ['Dataset Name', 'Algorithm Name', 'Cross Validation [1-10]', 'Hyper-Parameters Values',
                   'mean_squared_error', 'mean_absolute_error', 'median_absolute_error', 'r2_score',
                   'explained_variance_score', 'Training Time', 'Inference Time']
         writer.writerow(header)
 else:  # load already logged results to avoid redundancy and shorten runtime
-    for dataset_name, log_dataset in pd.read_csv('results.csv').groupby('Dataset Name'):
+    for dataset_name, log_dataset in pd.read_csv('results/results.csv').groupby('Dataset Name'):
         folds_in_dataset = {}
         datasets_in_log[dataset_name] = folds_in_dataset
         for fold, log_fold in log_dataset.groupby('Cross Validation [1-10]'):
@@ -107,7 +107,7 @@ for dataset_idx, file in enumerate(files):
                        runtime_train, runtime_test]
 
                 # save entry to log
-                with open('results.csv', 'a', newline='') as log_file:
+                with open('results/results.csv', 'a', newline='') as log_file:
                     writer = csv.writer(log_file)
                     writer.writerow(row)
 
