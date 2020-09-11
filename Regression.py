@@ -58,7 +58,8 @@ for dataset_idx, file in enumerate(files):
     # load and pre-process dataset
     dataset_name = os.fsdecode(file)[:-4]
     dataset = pd.read_csv('datasets/%s.csv' % dataset_name)
-    dataset = dataset.fillna(method='ffill').fillna(method='bfill')  # fill nan values
+    # dataset = dataset.fillna(method='ffill').fillna(method='bfill')  # fill nan values
+    dataset = dataset.fillna(dataset.mean())  # fill nan values
     dataset = pd.get_dummies(dataset)  # one-hot encode categorical features
     array = dataset.to_numpy()
     X, y = array[:, :-1], array[:, -1]

@@ -8,18 +8,24 @@ metric = 'mean_squared_error'
 
 # get average over cv folds
 df_results = pd.read_csv('results.csv', usecols=['Dataset Name', 'Algorithm Name', metric])
-algorithm_names = pd.unique(df_results['Algorithm Name'])
-groups_by_algorithm = df_results.groupby('Algorithm Name')
-average_results = {}
-for algorithm_name in algorithm_names:
-    df_algorithm = groups_by_algorithm.get_group(algorithm_name)
-    average_results[algorithm_name] = df_algorithm.groupby('Dataset Name').mean()[metric]
+dataset_names = pd.unique(df_results['Dataset Name'])
+model_names = pd.unique(df_results['Algorithm Name'])
+average_results = {'dataset': dataset_names}
+groups_by_model = df_results.groupby('Algorithm Name')
+for model_name in model_names:
+    df_model = groups_by_model.get_group(model_name)
+    groups_by_dataset = df_model.groupby('Dataset Name')
+    model_mean = []
+    for dataset_name in dataset_names:
+        model_mean.append(groups_by_dataset.get_group(dataset_name)[metric].mean())
+    average_results[model_name] = model_mean
 df_results = pd.DataFrame(average_results)
+df_results.to_csv('average_results.csv', index=False)
 
 # friedman and post hoc tests
-t_stat, p_val = friedmanchisquare(*[df_results[i] for i in algorithm_names])
+t_stat, p_val = friedmanchisquare(*[df_results[i] for i in model_names])
 print('\nfriedman test p-val = %s' % p_val)
-post_hoc_p_vals = posthoc_nemenyi_friedman(df_results.to_numpy())
-post_hoc_p_vals.columns = algorithm_names
+post_hoc_p_vals = posthoc_nemenyi_friedman(df_results.drop(columns='dataset').to_numpy())
+post_hoc_p_vals.columns = model_names
 print('\npost hoc p-vals:\n%s' % post_hoc_p_vals)
 
