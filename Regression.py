@@ -4,14 +4,19 @@ import numpy as np
 import pandas as pd
 from time import time
 from sklearn.model_selection import KFold
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import AdaBoostRegressor, RandomForestRegressor
 from sklearn.model_selection import RandomizedSearchCV
 from scipy.stats import uniform, randint
 from sklearn import metrics
+from sklearn.preprocessing import StandardScaler
+
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import AdaBoostRegressor, RandomForestRegressor
 from pycobra.cobra import Cobra
+from pycobra.ewa import Ewa
 from pycobra.diagnostics import Diagnostics
-from algorithms.BagBoo import BagBoo
+
+
+# from algorithms.BagBoo import BagBoo
 
 
 def get_time_string(time_in_seconds):
@@ -29,18 +34,24 @@ def get_time_string(time_in_seconds):
 
 
 num_folds = 10
-random_search_iters = 50
+random_search_iters = 10
 random_search_cv = 3
 models = [
     # {'name': 'AdaBoost', 'model': AdaBoostRegressor(DecisionTreeRegressor(random_state=1), random_state=1),
     #  'rs_params': {'n_estimators': randint(5, 100), 'base_estimator__ccp_alpha': uniform(0, 0.1)}},
+
     # {'name': 'RandomForest', 'model': RandomForestRegressor(random_state=1),
     #  'rs_params': {'n_estimators': randint(5, 50), 'ccp_alpha': uniform(0, 0.01)}},
+
     # {'name': 'RegressionTree', 'model': DecisionTreeRegressor(random_state=1),
     #  'rs_params': {'ccp_alpha': uniform(0, 0.01)}},
-    # {'name': 'Cobra'},
-    {'name': 'BagBoo', 'model': BagBoo(random_state=1),
-     'rs_params': {'n_bag': randint(5, 100), 'ccp_alpha': uniform(0, 0.1)}},
+
+    {'name': 'Cobra', 'model': Cobra},
+
+    {'name': 'Ewa', 'model': Ewa},
+
+    # {'name': 'BagBoo', 'model': BagBoo(random_state=1),
+    #  'rs_params': {'n_bag': randint(5, 100), 'ccp_alpha': uniform(0, 0.1)}},
 ]
 
 datasets_in_log = {}
@@ -51,6 +62,8 @@ if not os.path.exists('results/results.csv'):
                   'mean_squared_error', 'mean_absolute_error', 'median_absolute_error', 'r2_score',
                   'explained_variance_score', 'Training Time', 'Inference Time']
         writer.writerow(header)
+    with open('results/progress_log.txt', 'w') as file:
+        file.write('Progress:\n')
 else:  # load already logged results to avoid redundancy and shorten runtime
     for dataset_name, log_dataset in pd.read_csv('results/results.csv').groupby('Dataset Name'):
         folds_in_dataset = {}
@@ -69,6 +82,7 @@ for dataset_idx, file in enumerate(files):
     dataset = dataset.fillna(dataset.mean())  # fill nan values
     dataset = pd.get_dummies(dataset)  # one-hot encode categorical features
     array = dataset.to_numpy()
+    # array = StandardScaler().fit_transform(array)
     X, y = array[:, :-1], array[:, -1]
 
     # start k-fold cross validation
@@ -87,16 +101,22 @@ for dataset_idx, file in enumerate(files):
             except KeyError:  # if not, run iteration
                 start_time = int(time() * 1000)
 
-                if model['name'] == 'Cobra':
+                if model['name'] in ['Cobra', 'Ewa']:
                     # fit model
-                    best_model = Cobra(random_state=1)
+                    best_model = model['model'](random_state=1)
                     start_time_train = time()
                     np.random.seed(1)
-                    val_idx = np.random.choice(X_train.shape[0], int(X_train.shape[0] * 0.2), replace=False)
-                    X_val, y_val = X_train[val_idx, :], y_train[val_idx]
-                    best_model.set_epsilon(X_epsilon=X_val, y_epsilon=y_val, grid_points=random_search_iters)
+                    # val_idx = np.random.choice(X_train.shape[0], int(X_train.shape[0] * 0.2), replace=False)
+                    # X_val, y_val = X_train[val_idx, :], y_train[val_idx]
+                    X_val, y_val = X_train, y_train
+                    if model['name'] == 'Cobra':
+                        best_model.set_epsilon(X_epsilon=X_val, y_epsilon=y_val, grid_points=random_search_iters)
+                        best_parameters = {'epsilon': best_model.epsilon}
+                    else:  # Ewa
+                        best_model.set_beta(X_beta=X_val, y_beta=y_val)
+                        best_parameters = {'beta': best_model.beta}
+                    best_model.fit(X_train, y_train)
                     runtime_train = time() - start_time_train
-                    best_parameters = {'epsilon': best_model.epsilon}
                 else:
                     best_model = RandomizedSearchCV(model['model'], model['rs_params'], random_state=1,
                                                     n_iter=random_search_iters, cv=random_search_cv)
@@ -128,6 +148,9 @@ for dataset_idx, file in enumerate(files):
                 runtime = (round(time() * 1000) - start_time) / 1000
                 avg_runtime = (avg_runtime * (iteration - 1) + runtime) / iteration
                 eta = get_time_string((iterations - iteration) * avg_runtime)
-                print('%d/%d dataset %d/%d (%s) fold %d/%d model %d/%d (%s) time: %s ETA: %s' %
-                      (iteration, iterations, dataset_idx + 1, len(files), dataset_name, fold_idx + 1, len(folds),
-                       model_idx + 1, len(models), model['name'], get_time_string(runtime), eta))
+                progress_row = '%d/%d dataset %d/%d (%s) fold %d/%d model %d/%d (%s) time: %s ETA: %s' % (
+                    iteration, iterations, dataset_idx + 1, len(files), dataset_name, fold_idx + 1, len(folds),
+                    model_idx + 1, len(models), model['name'], get_time_string(runtime), eta)
+                print(progress_row)
+                with open('results/progress_log.txt', 'a') as file:
+                    file.write('%s\n' % progress_row)
