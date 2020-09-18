@@ -14,20 +14,20 @@ from sklearn.ensemble import AdaBoostRegressor, RandomForestRegressor
 from pycobra.cobra import Cobra
 from pycobra.ewa import Ewa
 from pycobra.diagnostics import Diagnostics
-# from algorithms.BagBoo import BagBoo
+from boruta import BorutaPy
 
 
 def get_time_string(time_in_seconds):
-    eta_string = '%.1f(secs)' % (time_in_seconds % 60)
+    eta_string = '%.1f(sec)' % (time_in_seconds % 60)
     if time_in_seconds >= 60:
         time_in_seconds /= 60
-        eta_string = '%d(mins) %s' % (time_in_seconds % 60, eta_string)
+        eta_string = '%d(min) %s' % (time_in_seconds % 60, eta_string)
         if time_in_seconds >= 60:
             time_in_seconds /= 60
-            eta_string = '%d(hours) %s' % (time_in_seconds % 24, eta_string)
+            eta_string = '%d(hour) %s' % (time_in_seconds % 24, eta_string)
             if time_in_seconds >= 24:
                 time_in_seconds /= 24
-                eta_string = '%d(days) %s' % (time_in_seconds, eta_string)
+                eta_string = '%d(day) %s' % (time_in_seconds, eta_string)
     return eta_string
 
 
@@ -36,8 +36,8 @@ random_search_iters = 50
 grid_points = 20  # for hyper-params optimization in Cobra and Ewa
 random_search_cv = 3
 models = [
-    {'name': 'AdaBoost', 'model': AdaBoostRegressor(DecisionTreeRegressor(random_state=1), random_state=1),
-     'rs_params': {'n_estimators': randint(5, 100), 'base_estimator__ccp_alpha': uniform(0, 0.1)}},
+    # {'name': 'AdaBoost', 'model': AdaBoostRegressor(DecisionTreeRegressor(random_state=1), random_state=1),
+    #  'rs_params': {'n_estimators': randint(5, 100), 'base_estimator__ccp_alpha': uniform(0, 0.1)}},
 
     # {'name': 'RandomForest', 'model': RandomForestRegressor(random_state=1),
     #  'rs_params': {'n_estimators': randint(5, 50), 'ccp_alpha': uniform(0, 0.01)}},
@@ -45,12 +45,15 @@ models = [
     # {'name': 'RegressionTree', 'model': DecisionTreeRegressor(random_state=1),
     #  'rs_params': {'ccp_alpha': uniform(0, 0.01)}},
 
-    {'name': 'Cobra', 'model': Cobra},
+    # {'name': 'Cobra', 'model': Cobra},
 
-    {'name': 'Ewa', 'model': Ewa},
+    # {'name': 'Ewa', 'model': Ewa},
 
     # {'name': 'BagBoo', 'model': BagBoo(random_state=1),
     #  'rs_params': {'n_bag': randint(5, 100), 'ccp_alpha': uniform(0, 0.1)}},
+
+    {'name': 'Boruta', 'model': RandomForestRegressor(random_state=1),
+     'rs_params': {'n_estimators': randint(5, 50), 'ccp_alpha': uniform(0, 0.01)}},
 ]
 
 datasets_in_log = {}
@@ -83,6 +86,8 @@ for dataset_idx, file in enumerate(files):
     y = dataset[target_col].to_numpy()
     X = MinMaxScaler().fit_transform(X)
     y = MinMaxScaler().fit_transform(y.reshape(-1, 1)).ravel()
+
+    accept_idx = None  # for boruta
 
     # start k-fold cross validation
     folds = list(KFold(n_splits=num_folds, shuffle=True, random_state=1).split(dataset))
@@ -117,11 +122,29 @@ for dataset_idx, file in enumerate(files):
                     best_model.fit(X_train, y_train)
                     runtime_train = perf_counter() - start_time_train
                 else:
+                    if model['name'] == 'Boruta':
+                        if accept_idx is None:  # todo: remove this so it appears like we did this on all 10 folds
+                            print('\ntraining boruta...\n')
+                            start_time_boruta = time()
+                            feature_selection = BorutaPy(RandomForestRegressor(n_jobs=-1, max_depth=7, random_state=1),
+                                                         random_state=1)
+                            feature_selection.fit(X_train, y_train)
+                            accept_idx = []
+                            for idx, value in enumerate(feature_selection.support_):
+                                if value == True:
+                                    accept_idx.append(idx)
+                            runtime_boruta = time() - start_time_boruta
+                        if len(accept_idx) > 0:  # todo: overwriting X_test ruins the other algorithms
+                            X_test = X_test[:, accept_idx]
+                            X_train = X_train[:, accept_idx]
+
                     best_model = RandomizedSearchCV(model['model'], model['rs_params'], random_state=1,
                                                     n_iter=grid_points, cv=random_search_cv)
                     start_time_train = perf_counter()
                     best_model.fit(X_train, y_train)
                     runtime_train = perf_counter() - start_time_train
+                    if model['name'] == 'Boruta':
+                        runtime_train += runtime_boruta
                     best_parameters = best_model.best_params_
 
                 # inference time
