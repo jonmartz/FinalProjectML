@@ -10,11 +10,10 @@ from sklearn import metrics
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import AdaBoostRegressor, RandomForestRegressor
 from pycobra.cobra import Cobra
 from pycobra.ewa import Ewa
 from pycobra.diagnostics import Diagnostics
-# from algorithms.BagBoo import BagBoo
+# from boruta import BorutaPy
 
 
 def get_time_string(time_in_seconds):
