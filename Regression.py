@@ -7,13 +7,12 @@ from sklearn.model_selection import KFold
 from sklearn.model_selection import RandomizedSearchCV
 from scipy.stats import uniform, randint
 from sklearn import metrics
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler
 
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import AdaBoostRegressor, RandomForestRegressor
 from pycobra.cobra import Cobra
 from pycobra.ewa import Ewa
-from pycobra.diagnostics import Diagnostics
 from boruta import BorutaPy
 
 
@@ -77,10 +76,8 @@ for dataset_idx, file in enumerate(files):
     target_col = dataset.columns[-1]
     X = pd.get_dummies(dataset.drop(columns=target_col)).to_numpy()  # one-hot encode categorical features
     y = dataset[target_col].to_numpy()
-    # X = MinMaxScaler().fit_transform(X)
-    # y = MinMaxScaler().fit_transform(y.reshape(-1, 1)).ravel()
-
-    accept_idx = None  # for boruta
+    X = MinMaxScaler().fit_transform(X)
+    y = MinMaxScaler().fit_transform(y.reshape(-1, 1)).ravel()
 
     # start k-fold cross validation
     folds = list(KFold(n_splits=num_folds, shuffle=True, random_state=1).split(dataset))
@@ -102,9 +99,6 @@ for dataset_idx, file in enumerate(files):
                     # fit model
                     best_model = model['model'](random_state=1)
                     start_time_train = perf_counter()
-                    # np.random.seed(1)
-                    # val_idx = np.random.choice(X_train.shape[0], int(X_train.shape[0] * 0.2), replace=False)
-                    # X_val, y_val = X_train[val_idx, :], y_train[val_idx]
                     X_val, y_val = X_train, y_train
                     if model['name'] == 'Cobra':
                         best_model.set_epsilon(X_epsilon=X_val, y_epsilon=y_val, grid_points=grid_points)
@@ -115,29 +109,27 @@ for dataset_idx, file in enumerate(files):
                     best_model.fit(X_train, y_train)
                     runtime_train = perf_counter() - start_time_train
                 else:
-                    # if model['name'] == 'Boruta':
-                    #     if accept_idx is None:  # todo: remove this so it appears like we did this on all 10 folds
-                    #         print('\ntraining boruta...\n')
-                    #         start_time_boruta = time()
-                    #         feature_selection = BorutaPy(RandomForestRegressor(n_jobs=-1, max_depth=7, random_state=1),
-                    #                                      random_state=1)
-                    #         feature_selection.fit(X_train, y_train)
-                    #         accept_idx = []
-                    #         for idx, value in enumerate(feature_selection.support_):
-                    #             if value == True:
-                    #                 accept_idx.append(idx)
-                    #         runtime_boruta = time() - start_time_boruta
-                    #     if len(accept_idx) > 0:  # todo: overwriting X_test ruins the other algorithms
-                    #         X_test = X_test[:, accept_idx]
-                    #         X_train = X_train[:, accept_idx]
+                    if model['name'] == 'Boruta':
+                        print('\ntraining boruta...\n')
+                        start_time_boruta = time()
+                        feature_selection = BorutaPy(RandomForestRegressor(n_jobs=-1, max_depth=7, random_state=1),
+                                                     random_state=1)
+                        feature_selection.fit(X_train, y_train)
+                        accept_idx = []
+                        for idx, value in enumerate(feature_selection.support_):
+                            if value == True:
+                                accept_idx.append(idx)
+                        runtime_boruta = time() - start_time_boruta
+                        if len(accept_idx) > 0:
+                            backup = [X_train, X_test]
+                            X_test = X_test[:, accept_idx]
+                            X_train = X_train[:, accept_idx]
 
                     best_model = RandomizedSearchCV(model['model'], model['rs_params'], random_state=1,
                                                     n_iter=grid_points, cv=random_search_cv)
                     start_time_train = perf_counter()
                     best_model.fit(X_train, y_train)
                     runtime_train = perf_counter() - start_time_train
-                    # if model['name'] == 'Boruta':
-                    #     runtime_train += runtime_boruta
                     best_parameters = best_model.best_params_
 
                 # inference time
@@ -155,6 +147,9 @@ for dataset_idx, file in enumerate(files):
                        metrics.r2_score(y_test, y_pred),
                        metrics.explained_variance_score(y_test, y_pred),
                        runtime_train, runtime_test]
+
+                if model['name'] == 'Boruta':  # return removed features
+                    X_train, X_test = backup
 
                 # save entry to log
                 with open('results/results.csv', 'a', newline='') as log_file:
