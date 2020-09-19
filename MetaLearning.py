@@ -3,6 +3,7 @@ import pandas as pd
 import xgboost as xgb
 from scipy.stats import friedmanchisquare
 from scikit_posthocs import posthoc_nemenyi_friedman
+from scipy.stats import rankdata
 
 
 def create_meta_dataset():
@@ -34,7 +35,7 @@ def create_meta_dataset():
 def get_meta_learning_results():
     meta_dataset = pd.read_csv('meta_learning/meta_dataset.csv')
     datasets = pd.unique(meta_dataset['dataset'])
-    average_results = pd.read_csv('average_results.csv', index_col='dataset')
+    average_results = pd.read_csv('results/average_results.csv', index_col='dataset')
     models = average_results.columns
 
     # start the leave-one-out cross validation
@@ -70,6 +71,7 @@ def do_statistical_test():
     post_hoc_p_vals = posthoc_nemenyi_friedman(df_results.drop(columns='dataset').to_numpy())
     post_hoc_p_vals.columns = model_names
     print('\npost hoc p-vals:\n%s' % post_hoc_p_vals)
+    post_hoc_p_vals.to_csv('meta_learning/post_hoc.csv', index=False)
 
 
 def get_feature_importances():
@@ -99,7 +101,16 @@ def get_feature_importances():
     pd.DataFrame(rows, columns=columns).to_csv('meta_learning/feature_importances.csv', index=False)
 
 
+def save_ranks():
+    df_results = pd.read_csv('meta_learning/average_results.csv')
+    df = df_results.drop(columns='dataset')
+    ranks = rankdata(df.to_numpy(), method='dense', axis=1)
+    df = pd.DataFrame(ranks, columns=df.columns)
+    df['dataset'] = df_results['dataset']
+    df.to_csv('meta_learning/ranks.csv')
+
 # create_meta_dataset()
 # get_meta_learning_results()
-# do_statistical_test()
-get_feature_importances()
+do_statistical_test()
+# get_feature_importances()
+# save_ranks()

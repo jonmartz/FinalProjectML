@@ -2,6 +2,7 @@ import os
 import pandas as pd
 from scipy.stats import friedmanchisquare
 from scikit_posthocs import posthoc_nemenyi_friedman
+from scipy.stats import rankdata
 
 
 metric = 'mean_squared_error'
@@ -22,10 +23,18 @@ for model_name in model_names:
 df_results = pd.DataFrame(average_results)
 df_results.to_csv('results/average_results.csv', index=False)
 
+# save ranks
+df = df_results.drop(columns='dataset')
+ranks = rankdata(df.to_numpy(), method='dense', axis=1)
+df = pd.DataFrame(ranks, columns=df.columns)
+df['dataset'] = df_results['dataset']
+df.to_csv('results/ranks.csv')
+
 # friedman and post hoc tests
 t_stat, p_val = friedmanchisquare(*[df_results[i] for i in model_names])
 print('\nfriedman test p-val = %s' % p_val)
 post_hoc_p_vals = posthoc_nemenyi_friedman(df_results.drop(columns='dataset').to_numpy())
 post_hoc_p_vals.columns = model_names
 print('\npost hoc p-vals:\n%s' % post_hoc_p_vals)
+post_hoc_p_vals.to_csv('results/post_hoc.csv', index=False)
 

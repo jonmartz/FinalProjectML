@@ -31,26 +31,19 @@ def get_time_string(time_in_seconds):
     return eta_string
 
 
+analyze_model = True
+
 num_folds = 10
 random_search_iters = 50
-grid_points = 20  # for hyper-params optimization in Cobra and Ewa
+grid_points = 10  # for hyper-params optimization in Cobra and Ewa
 random_search_cv = 3
 models = [
-    # {'name': 'AdaBoost', 'model': AdaBoostRegressor(DecisionTreeRegressor(random_state=1), random_state=1),
-    #  'rs_params': {'n_estimators': randint(5, 100), 'base_estimator__ccp_alpha': uniform(0, 0.1)}},
+    {'name': 'AdaBoost', 'model': AdaBoostRegressor(DecisionTreeRegressor(random_state=1), random_state=1),
+     'rs_params': {'n_estimators': randint(5, 100), 'base_estimator__ccp_alpha': uniform(0, 0.1)}},
 
-    # {'name': 'RandomForest', 'model': RandomForestRegressor(random_state=1),
-    #  'rs_params': {'n_estimators': randint(5, 50), 'ccp_alpha': uniform(0, 0.01)}},
+    {'name': 'Cobra', 'model': Cobra},
 
-    # {'name': 'RegressionTree', 'model': DecisionTreeRegressor(random_state=1),
-    #  'rs_params': {'ccp_alpha': uniform(0, 0.01)}},
-
-    # {'name': 'Cobra', 'model': Cobra},
-
-    # {'name': 'Ewa', 'model': Ewa},
-
-    # {'name': 'BagBoo', 'model': BagBoo(random_state=1),
-    #  'rs_params': {'n_bag': randint(5, 100), 'ccp_alpha': uniform(0, 0.1)}},
+    {'name': 'Ewa', 'model': Ewa},
 
     {'name': 'Boruta', 'model': RandomForestRegressor(random_state=1),
      'rs_params': {'n_estimators': randint(5, 50), 'ccp_alpha': uniform(0, 0.01)}},
@@ -84,8 +77,8 @@ for dataset_idx, file in enumerate(files):
     target_col = dataset.columns[-1]
     X = pd.get_dummies(dataset.drop(columns=target_col)).to_numpy()  # one-hot encode categorical features
     y = dataset[target_col].to_numpy()
-    X = MinMaxScaler().fit_transform(X)
-    y = MinMaxScaler().fit_transform(y.reshape(-1, 1)).ravel()
+    # X = MinMaxScaler().fit_transform(X)
+    # y = MinMaxScaler().fit_transform(y.reshape(-1, 1)).ravel()
 
     accept_idx = None  # for boruta
 
@@ -122,29 +115,29 @@ for dataset_idx, file in enumerate(files):
                     best_model.fit(X_train, y_train)
                     runtime_train = perf_counter() - start_time_train
                 else:
-                    if model['name'] == 'Boruta':
-                        if accept_idx is None:  # todo: remove this so it appears like we did this on all 10 folds
-                            print('\ntraining boruta...\n')
-                            start_time_boruta = time()
-                            feature_selection = BorutaPy(RandomForestRegressor(n_jobs=-1, max_depth=7, random_state=1),
-                                                         random_state=1)
-                            feature_selection.fit(X_train, y_train)
-                            accept_idx = []
-                            for idx, value in enumerate(feature_selection.support_):
-                                if value == True:
-                                    accept_idx.append(idx)
-                            runtime_boruta = time() - start_time_boruta
-                        if len(accept_idx) > 0:  # todo: overwriting X_test ruins the other algorithms
-                            X_test = X_test[:, accept_idx]
-                            X_train = X_train[:, accept_idx]
+                    # if model['name'] == 'Boruta':
+                    #     if accept_idx is None:  # todo: remove this so it appears like we did this on all 10 folds
+                    #         print('\ntraining boruta...\n')
+                    #         start_time_boruta = time()
+                    #         feature_selection = BorutaPy(RandomForestRegressor(n_jobs=-1, max_depth=7, random_state=1),
+                    #                                      random_state=1)
+                    #         feature_selection.fit(X_train, y_train)
+                    #         accept_idx = []
+                    #         for idx, value in enumerate(feature_selection.support_):
+                    #             if value == True:
+                    #                 accept_idx.append(idx)
+                    #         runtime_boruta = time() - start_time_boruta
+                    #     if len(accept_idx) > 0:  # todo: overwriting X_test ruins the other algorithms
+                    #         X_test = X_test[:, accept_idx]
+                    #         X_train = X_train[:, accept_idx]
 
                     best_model = RandomizedSearchCV(model['model'], model['rs_params'], random_state=1,
                                                     n_iter=grid_points, cv=random_search_cv)
                     start_time_train = perf_counter()
                     best_model.fit(X_train, y_train)
                     runtime_train = perf_counter() - start_time_train
-                    if model['name'] == 'Boruta':
-                        runtime_train += runtime_boruta
+                    # if model['name'] == 'Boruta':
+                    #     runtime_train += runtime_boruta
                     best_parameters = best_model.best_params_
 
                 # inference time
@@ -167,6 +160,27 @@ for dataset_idx, file in enumerate(files):
                 with open('results/results.csv', 'a', newline='') as log_file:
                     writer = csv.writer(log_file)
                     writer.writerow(row)
+
+                if analyze_model:
+                    e = best_model.epsilon
+                    val_len = len(best_model.X_l_)
+                    test_len = len(X_test)
+                    df_analysis = pd.DataFrame({
+                        'set': ['val']*val_len + ['test']*test_len,
+                        'i': list(range(1, val_len+1)) + list(range(1, test_len+1)),
+                        'y': list(best_model.y_l_) + list(y_test),
+                        'pred': ['']*val_len + list(y_pred),
+                    })
+                    for name, estimator in best_model.estimators_.items():
+                        preds_val = list(best_model.machine_predictions_[name])
+                        preds_test = list(estimator.predict(X_test))
+                        df_analysis[name] = preds_val + preds_test
+                        for idx, y_t in enumerate(preds_test):
+                            accept_col = [1 if np.abs(y_v - y_t) <= e else 0 for y_v in preds_val]
+                            accept_col += [''] * test_len
+                            df_analysis['%s accept %d' % (name, idx + 1)] = accept_col
+                    df_analysis.to_csv('results/analysis.csv', index=False)
+                    exit()
 
                 # print runtime and ETA
                 runtime = (round(time() * 1000) - start_time) / 1000
