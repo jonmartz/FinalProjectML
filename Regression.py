@@ -1,3 +1,8 @@
+"""
+This script collects the results from all the algorithms on all the 100 regression datasets in a
+10-fold cross validation with an inner 3-fold cross validation for parameter tuning.
+"""
+
 import os
 import csv
 import numpy as np
@@ -9,6 +14,7 @@ from scipy.stats import uniform, randint
 from sklearn import metrics
 from sklearn.preprocessing import MinMaxScaler
 
+# candidate algorithms
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import AdaBoostRegressor, RandomForestRegressor
 from pycobra.cobra import Cobra
@@ -17,26 +23,30 @@ from boruta import BorutaPy
 
 
 def get_time_string(time_in_seconds):
-    eta_string = '%.1f(sec)' % (time_in_seconds % 60)
+    """
+    Coverts the input time in seconds into the same time expressed in days, hours, minutes and seconds.
+    :param time_in_seconds: to print
+    :return: string
+    """
+    time_string = '%.1f(sec)' % (time_in_seconds % 60)
     if time_in_seconds >= 60:
         time_in_seconds /= 60
-        eta_string = '%d(min) %s' % (time_in_seconds % 60, eta_string)
+        time_string = '%d(min) %s' % (time_in_seconds % 60, time_string)
         if time_in_seconds >= 60:
             time_in_seconds /= 60
-            eta_string = '%d(hour) %s' % (time_in_seconds % 24, eta_string)
+            time_string = '%d(hour) %s' % (time_in_seconds % 24, time_string)
             if time_in_seconds >= 24:
                 time_in_seconds /= 24
-                eta_string = '%d(day) %s' % (time_in_seconds, eta_string)
-    return eta_string
+                time_string = '%d(day) %s' % (time_in_seconds, time_string)
+    return time_string
 
 
-analyze_model = True
+analyze_model = True  # for extracting the illustration examples shown in the report
 
 num_folds = 10
 random_search_iters = 50
-grid_points = 10  # for hyper-params optimization in Cobra and Ewa
-random_search_cv = 3
-models = [
+random_search_cv = 3  # num of inner cross validation folds
+models = [  # rs_params indicates the parameter space to be explored in the Random Search
     {'name': 'AdaBoost', 'model': AdaBoostRegressor(DecisionTreeRegressor(random_state=1), random_state=1),
      'rs_params': {'n_estimators': randint(5, 100), 'base_estimator__ccp_alpha': uniform(0, 0.1)}},
 
@@ -48,7 +58,8 @@ models = [
      'rs_params': {'n_estimators': randint(5, 50), 'ccp_alpha': uniform(0, 0.01)}},
 ]
 
-datasets_in_log = {}
+# prepare results log
+datasets_in_log = {}  # for not computing an iteration if it's already in log
 if not os.path.exists('results/results.csv'):
     with open('results/results.csv', 'w', newline='') as log_file:
         writer = csv.writer(log_file)
@@ -58,7 +69,7 @@ if not os.path.exists('results/results.csv'):
         writer.writerow(header)
     with open('results/progress_log.txt', 'w') as file:
         file.write('Progress:\n')
-else:  # load already logged results to avoid redundancy and shorten runtime
+else:  # load already logged results to avoid redundancy of computations to shorten runtime
     for dataset_name, log_dataset in pd.read_csv('results/results.csv').groupby('Dataset Name'):
         folds_in_dataset = {}
         datasets_in_log[dataset_name] = folds_in_dataset
@@ -66,7 +77,7 @@ else:  # load already logged results to avoid redundancy and shorten runtime
             folds_in_dataset[fold] = set(log_fold['Algorithm Name'])
 
 files = os.listdir(os.fsencode('datasets'))
-avg_runtime, iteration, iterations = 0, 0, len(files) * len(models) * num_folds
+avg_runtime, iteration, iterations = 0, 0, len(files) * len(models) * num_folds  # only ETA calculation
 for dataset_idx, file in enumerate(files):
 
     # load and pre-process dataset
@@ -99,40 +110,41 @@ for dataset_idx, file in enumerate(files):
                     # fit model
                     best_model = model['model'](random_state=1)
                     start_time_train = perf_counter()
-                    X_val, y_val = X_train, y_train
+                    # the inner cross validation is performed internally in set_epsilon() or set_beta()
                     if model['name'] == 'Cobra':
-                        best_model.set_epsilon(X_epsilon=X_val, y_epsilon=y_val, grid_points=grid_points)
+                        best_model.set_epsilon(X_epsilon=X_train, y_epsilon=y_train, grid_points=random_search_iters)
                         best_parameters = {'epsilon': best_model.epsilon}
                     else:  # Ewa
-                        best_model.set_beta(X_beta=X_val, y_beta=y_val)
+                        best_model.set_beta(X_beta=X_train, y_beta=y_train)
                         best_parameters = {'beta': best_model.beta}
                     best_model.fit(X_train, y_train)
                     runtime_train = perf_counter() - start_time_train
                 else:
                     if model['name'] == 'Boruta':
                         print('\ntraining boruta...\n')
-                        start_time_boruta = time()
                         feature_selection = BorutaPy(RandomForestRegressor(n_jobs=-1, max_depth=7, random_state=1),
                                                      random_state=1)
+                        # the inner cross validation was performed on the base inducers
                         feature_selection.fit(X_train, y_train)
                         accept_idx = []
+                        # get the indexes of the columns to be kept
                         for idx, value in enumerate(feature_selection.support_):
-                            if value == True:
+                            if value:
                                 accept_idx.append(idx)
-                        runtime_boruta = time() - start_time_boruta
-                        if len(accept_idx) > 0:
-                            backup = [X_train, X_test]
+                        if len(accept_idx) > 0:  # if boruta decided to throw away all columns, ignore it
+                            backup = [X_train, X_test]  # for running the other algorithms on this fold
+                            # remove features not selected by boruta
                             X_test = X_test[:, accept_idx]
                             X_train = X_train[:, accept_idx]
-
+                    # fit model
                     best_model = RandomizedSearchCV(model['model'], model['rs_params'], random_state=1,
-                                                    n_iter=grid_points, cv=random_search_cv)
+                                                    n_iter=random_search_iters, cv=random_search_cv)
                     start_time_train = perf_counter()
                     best_model.fit(X_train, y_train)
                     runtime_train = perf_counter() - start_time_train
                     best_parameters = best_model.best_params_
 
-                # inference time
+                # measure inference time
                 X_inference = X_test[np.random.randint(0, len(X_test), 1000)]  # normalize to 1000 samples
                 start_time_test = perf_counter()
                 best_model.predict(X_inference)
@@ -156,15 +168,15 @@ for dataset_idx, file in enumerate(files):
                     writer = csv.writer(log_file)
                     writer.writerow(row)
 
-                if analyze_model:
+                if analyze_model:  # only for extracting the illustration examples in the report
                     e = best_model.epsilon
                     val_len = len(best_model.X_l_)
                     test_len = len(X_test)
                     df_analysis = pd.DataFrame({
-                        'set': ['val']*val_len + ['test']*test_len,
-                        'i': list(range(1, val_len+1)) + list(range(1, test_len+1)),
+                        'set': ['val'] * val_len + ['test'] * test_len,
+                        'i': list(range(1, val_len + 1)) + list(range(1, test_len + 1)),
                         'y': list(best_model.y_l_) + list(y_test),
-                        'pred': ['']*val_len + list(y_pred),
+                        'pred': [''] * val_len + list(y_pred),
                     })
                     for name, estimator in best_model.estimators_.items():
                         preds_val = list(best_model.machine_predictions_[name])
