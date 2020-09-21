@@ -14,27 +14,35 @@ Adaboost - The well-known adaptive boosting meta-algorithm (formulated by Yoav F
 
 The statistical data analysis includes performing the Friedman test on the MSE metric results of the four algorithms and additional meta-learning model implementation using XGBoost that performs the binary classification task of determining whether an algorithm will be the best performing one (rank 1) given a predefined dataset’s meta-features.
 
+
 Installation
 
 pip install pycobra
 
 pip install Boruta
 
+
 Dependencies
 
 Python 3.4+
 numpy, scipy, scikit-learn, matplotlib, pandas, seaborn.
 
+
 Execution:
 
 Regression.py
 
+
 Hyper-Parameters:
 
 n_estimators - sets the number of estimators in the chosen ensemble method.
+
 estimator - A supervised learning estimator, with a 'fit' method that returns the feature_importances_ attribute. Important features must correspond to high absolute values in the feature_importances_.
+
 epsilon - for determining the "distance" between the initial estimators and the new estimator (used for COBRA).
+
 beta - the "temperature" parameter, which is used to build the estimator fn based on data. (for further explanation, look at EWA reference above).
+
 machine_list - determines which list of initial estimators will be used for building the new estimator (used for COBRA & EWA).
 
 
