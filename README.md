@@ -33,7 +33,7 @@ Hyper-Parameters:
 n_estimators - sets the number of estimators in the chosen ensemble method.
 estimator - A supervised learning estimator, with a 'fit' method that returns the feature_importances_ attribute. Important features must correspond to high absolute values in the feature_importances_.
 epsilon - for determining the "distance" between the initial estimators and the new estimator (used for COBRA).
-beta - the "temperature" parameter, which is used to build the estimator fn based on data. (fur further explanation, look at EWA reference above).
+beta - the "temperature" parameter, which is used to build the estimator fn based on data. (for further explanation, look at EWA reference above).
 machine_list - determines which list of initial estimators will be used for building the new estimator (used for COBRA & EWA).
 
 
@@ -43,7 +43,7 @@ Biau, Fischer, Guedj and Malley (2016), COBRA: A combined regression strategy. J
 Dalalyan, Arnak S., and Alexandre B. Tsybakov. "Aggregation by exponential weighting and sharp oracle inequalities." International Conference on Computational Learning Theory. Springer, Berlin, Heidelberg, 2007.
 Miron B. Kursa, Witold R. Rudnicki: “Feature Selection with the Boruta Package". Feature Selection with the Boruta Package. September 2010, Volume 36, Issue 11.
 Guedj and Srinivasa Desikan (2020), Kernel-based ensemble learning in Python. Information.
-Guedj and Srinivasa Desikan (2018), Pycobra: A Python Toolbox for Ensemble Learning and Visualisation. Journal of Machine Learning Research.
+Guedj and Srinivasa Desikan (2018), Pycobra: A Python Toolbox for Ensemble Learning and Visualization. Journal of Machine Learning Research.
 
 
 
