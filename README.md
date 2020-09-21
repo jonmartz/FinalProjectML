@@ -1,6 +1,6 @@
-# FinalProjectML
+# FinalProjectML 
 
-What's in this project?
+What's in this project? (Based on a ML course by Pr. Lior Rokach, BGU)
 
 This project includes the execution and the statistical comparison of these four algorithms:
 
