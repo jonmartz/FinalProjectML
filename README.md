@@ -15,14 +15,14 @@ Adaboost - The well-known adaptive boosting meta-algorithm (formulated by Yoav F
 The statistical data analysis includes performing the Friedman test on the MSE metric results of the four algorithms and additional meta-learning model implementation using XGBoost that performs the binary classification task of determining whether an algorithm will be the best performing one (rank 1) given a predefined dataset’s meta-features.
 
 
-Installation
+Installation:
 
   pip install pycobra
   
   pip install Boruta
 
 
-Dependencies
+Dependencies:
 
   Python 3.4+
   numpy, scipy, scikit-learn, matplotlib, pandas, seaborn.
