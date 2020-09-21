@@ -17,6 +17,7 @@ The statistical data analysis includes performing the Friedman test on the MSE m
 Installation
 
 pip install pycobra
+
 pip install Boruta
 
 Dependencies
