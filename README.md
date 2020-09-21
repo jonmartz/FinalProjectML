@@ -50,9 +50,13 @@ Hyper-Parameters:
 Reference:
 
 Biau, Fischer, Guedj and Malley (2016), COBRA: A combined regression strategy. Journal of Multivariate Analysis.
+
 Dalalyan, Arnak S., and Alexandre B. Tsybakov. "Aggregation by exponential weighting and sharp oracle inequalities." International Conference on Computational Learning Theory. Springer, Berlin, Heidelberg, 2007.
+
 Miron B. Kursa, Witold R. Rudnicki: “Feature Selection with the Boruta Package". Feature Selection with the Boruta Package. September 2010, Volume 36, Issue 11.
+
 Guedj and Srinivasa Desikan (2020), Kernel-based ensemble learning in Python. Information.
+
 Guedj and Srinivasa Desikan (2018), Pycobra: A Python Toolbox for Ensemble Learning and Visualization. Journal of Machine Learning Research.
 
 
