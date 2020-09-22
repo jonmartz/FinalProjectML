@@ -16,38 +16,45 @@ The statistical data analysis includes performing the Friedman test on the MSE m
 
 
 Installation:
-
-  pip install pycobra
-  
-  pip install Boruta
+1. pip install pycobra
+2. pip install Boruta
 
 
 Dependencies:
-
-  Python 3.4+
-  numpy, scipy, scikit-learn, matplotlib, pandas, seaborn.
+1. Python 3.4+
+2. numpy, scipy, scikit-learn, matplotlib, pandas, seaborn.
 
 
 Execution:
 
-Regression.py
+1. First run Regression.py, which will train and test the algorithms contained in the "models" list (line 49) on 100 regression datasets. The script will output a file "results.csv" inside the "results" folder.
+
+2. Run StatisticalTests.py to obtain results of a Friedman and post-hoc tests on the results collected by the Regression.py.
+
+3. Run MetaLearning.py to train and test a meta-learning model (XGBoost) on the meta-features and results collected by Regression.py, including statistical tests and extraction of feature importance.
 
 
-Hyper-Parameters:
+Hyper-Parameters tuned:
 
-  n_estimators - sets the number of estimators in the chosen ensemble method.
+AdaBoost:
+n_estimators - sets the number of estimators in the chosen ensemble method.
+ccp_alpha - regularization parameter for the base estimators.
   
-  estimator - A supervised learning estimator, with a 'fit' method that returns the feature_importances_ attribute. Important features must correspond to high absolute values in the feature_importances_.
+Cobra:
+epsilon - for determining the "distance" between the initial estimators and the new estimator.
+machine_list - list of estimator types to be considered by the algorithm.
+
+Ewa:
+beta - the "temperature" parameter, which is used to build the estimator fn based on data. (for further explanation, look at EWA reference above).
+machine_list - list of estimator types to be considered by the algorithm.
   
-  epsilon - for determining the "distance" between the initial estimators and the new estimator (used for COBRA).
-  
-  beta - the "temperature" parameter, which is used to build the estimator fn based on data. (for further explanation, look at EWA reference above).
-  
-  machine_list - determines which list of initial estimators will be used for building the new estimator (used for COBRA & EWA).
+Boruta:
+n_estimators - sets the number of estimators in the chosen ensemble method.
+ccp_alpha - regularization parameter for the base estimators.
 
 
 
-Reference:
+References:
 
 Biau, Fischer, Guedj and Malley (2016), COBRA: A combined regression strategy. Journal of Multivariate Analysis.
 
