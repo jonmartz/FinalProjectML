@@ -47,15 +47,15 @@ num_folds = 10
 random_search_iters = 50
 random_search_cv = 3  # num of inner cross validation folds
 models = [  # rs_params indicates the parameter space to be explored in the Random Search
-    {'name': 'AdaBoost', 'model': AdaBoostRegressor(DecisionTreeRegressor(random_state=1), random_state=1),
-     'rs_params': {'n_estimators': randint(5, 100), 'base_estimator__ccp_alpha': uniform(0, 0.1)}},
-
-    {'name': 'Cobra', 'model': Cobra},
+    # {'name': 'AdaBoost', 'model': AdaBoostRegressor(DecisionTreeRegressor(random_state=1), random_state=1),
+    #  'rs_params': {'n_estimators': randint(5, 100), 'base_estimator__ccp_alpha': uniform(0, 0.1)}},
+    #
+    # {'name': 'Cobra', 'model': Cobra},
 
     {'name': 'Ewa', 'model': Ewa},
 
-    {'name': 'Boruta', 'model': RandomForestRegressor(random_state=1),
-     'rs_params': {'n_estimators': randint(5, 50), 'ccp_alpha': uniform(0, 0.01)}},
+    # {'name': 'Boruta', 'model': RandomForestRegressor(random_state=1),
+    #  'rs_params': {'n_estimators': randint(5, 50), 'ccp_alpha': uniform(0, 0.01)}},
 ]
 
 # prepare results log
@@ -169,23 +169,41 @@ for dataset_idx, file in enumerate(files):
                     writer.writerow(row)
 
                 if analyze_model:  # only for extracting the illustration examples in the report
-                    e = best_model.epsilon
-                    val_len = len(best_model.X_l_)
-                    test_len = len(X_test)
-                    df_analysis = pd.DataFrame({
-                        'set': ['val'] * val_len + ['test'] * test_len,
-                        'i': list(range(1, val_len + 1)) + list(range(1, test_len + 1)),
-                        'y': list(best_model.y_l_) + list(y_test),
-                        'pred': [''] * val_len + list(y_pred),
-                    })
-                    for name, estimator in best_model.estimators_.items():
-                        preds_val = list(best_model.machine_predictions_[name])
-                        preds_test = list(estimator.predict(X_test))
-                        df_analysis[name] = preds_val + preds_test
-                        for idx, y_t in enumerate(preds_test):
-                            accept_col = [1 if np.abs(y_v - y_t) <= e else 0 for y_v in preds_val]
-                            accept_col += [''] * test_len
-                            df_analysis['%s accept %d' % (name, idx + 1)] = accept_col
+                    if model['name'] == 'Cobra':
+                        e = best_model.epsilon
+                        val_len = len(best_model.X_l_)
+                        test_len = len(X_test)
+                        df_analysis = pd.DataFrame({
+                            'set': ['val'] * val_len + ['test'] * test_len,
+                            'i': list(range(1, val_len + 1)) + list(range(1, test_len + 1)),
+                            'y': list(best_model.y_l_) + list(y_test),
+                            'pred': [''] * val_len + list(y_pred),
+                        })
+                        for name, estimator in best_model.estimators_.items():
+                            preds_val = list(best_model.machine_predictions_[name])
+                            preds_test = list(estimator.predict(X_test))
+                            df_analysis[name] = preds_val + preds_test
+                            for idx, y_t in enumerate(preds_test):
+                                accept_col = [1 if np.abs(y_v - y_t) <= e else 0 for y_v in preds_val]
+                                accept_col += [''] * test_len
+                                df_analysis['%s accept %d' % (name, idx + 1)] = accept_col
+                    else:
+                        b = best_model.beta
+                        val_len = len(best_model.X_l_)
+                        test_len = len(X_test)
+                        df_analysis = pd.DataFrame({
+                            'set': ['val'] * val_len + ['test'] * test_len,
+                            'i': list(range(1, val_len + 1)) + list(range(1, test_len + 1)),
+                            'y': list(best_model.y_l_) + list(y_test),
+                            'pred': [''] * val_len + list(y_pred),
+                        })
+                        rows = []
+                        for name, estimator in best_model.estimators_.items():
+                            preds_val = list(estimator.predict(best_model.X_l_))
+                            preds_test = list(estimator.predict(X_test))
+                            df_analysis[name] = preds_val + preds_test
+                            rows.append([name, best_model.machine_MSE_[name], best_model.machine_weight_[name]])
+                        pd.DataFrame(rows, columns=['model', 'MSE', 'weight']).to_csv('results/analysis_short.csv')
                     df_analysis.to_csv('results/analysis.csv', index=False)
                     exit()
 
